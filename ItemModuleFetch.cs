@@ -1,13 +1,12 @@
-﻿using BS;
+﻿using ThunderRoad;
 
 namespace HoldingBag
 {
     public class ItemModuleFetch : ItemModule
     {
-        public int itemCategory = 2;
+        public int itemCategory = -1;
         public int capacity = 0;
         public bool despawnBagOnEmpty = false;
-        public bool onlyPurchaseable = true;
         public string[] excludedCategories = { };
         public string[] excludedItems = { };
         public bool overrideMode = false;

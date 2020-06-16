@@ -1,7 +1,8 @@
 ﻿using UnityEngine;
-using BS;
+using ThunderRoad;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace HoldingBag
 {
@@ -14,7 +15,6 @@ namespace HoldingBag
         protected List<string> parsedItemsList;
         private bool infiniteUses = false;
         private int usesRemaining = 0;
-
         protected void Awake()
         {
             item = this.GetComponent<Item>();
@@ -22,35 +22,37 @@ namespace HoldingBag
             holder = item.GetComponentInChildren<ObjectHolder>();
             holder.UnSnapped += new ObjectHolder.HolderDelegate(this.OnWeaponItemRemoved);
 
-            // Get BS "master list" first, which will be further parsed into the final items list.
-            //Misc = 0,
-            //Apparel = 1,
-            //Weapon = 2,
-            //Quiver = 3,
-            //Potion = 4,
-            //Prop = 5,
-            //Body = 6,
-            //Shield = 7
-            var categoryEnums = Enum.GetValues(typeof(ItemData.Category));
-            ItemData.Category chosenCategory = (ItemData.Category)categoryEnums.GetValue(module.itemCategory);
-            
-            // Trim itemsList to just purchaseable items, unless explicitly overridden in module
-            if (module.onlyPurchaseable)
+            //Trim list of ItemPhysic IDs by sub-type. Each ItemPhysic has its own type, defined by these enum indicies:
+            //Misc = 0
+            //Weapon = 1
+            //Quiver = 2
+            //Potion = 3
+            //Prop = 4
+            //Body = 5
+            //Shield = 6
+
+            //Get all ItemPhysic IDs from the chosen category. If no valid itemCategory is set, then no trimming is done and all types are valid for return
+            if (module.itemCategory >= 0 || module.itemCategory > 6)
             {
-                itemsList = Catalog.current.GetAllItemID(chosenCategory).FindAll(i => Catalog.current.GetData<ItemData>(i, true).purchasable.Equals(true));
+                var categoryEnums = Enum.GetValues(typeof(ItemPhysic.Type));
+                ItemPhysic.Type chosenCategory = (ItemPhysic.Type)categoryEnums.GetValue(module.itemCategory);
+                itemsList = Catalog.GetAllID<ItemPhysic>().FindAll(i => Catalog.GetData<ItemPhysic>(i, true).type.Equals(chosenCategory));
+                //Only include ItemPhysic IDs which are purchasable 
+                itemsList = itemsList.FindAll(i => Catalog.GetData<ItemPhysic>(i, true).purchasable.Equals(true));
             }
+            //Otherwise, populate the list with everything as long as it is purchasable
             else
             {
-                itemsList = Catalog.current.GetAllItemID(chosenCategory);
+                itemsList = Catalog.GetAllID<ItemPhysic>().FindAll(i => Catalog.GetData<ItemPhysic>(i, true).purchasable.Equals(true));
             }
-
-            // If in `overrideMode`, first fetch items from the given category (if supplied) and then add any additionally given items to the parsed list
+            
+            // If the plugin is in `overrideMode`, first fetch items from the given category (if supplied) and then add any additionally given items to the parsed list
             if (module.overrideMode)
             {
                 parsedItemsList = new List<string>();
                 if (!String.IsNullOrEmpty(module.overrideCategory))
                 {
-                    parsedItemsList = itemsList.FindAll(i => Catalog.current.GetData<ItemData>(i, true).storageCategory.Contains(module.overrideCategory));
+                    parsedItemsList = itemsList.FindAll(i => Catalog.GetData<ItemPhysic>(i, true).categoryPath.Any(j => j.Contains(module.overrideCategory)));
                 }
 
                 foreach (string itemName in module.overrideItems)
@@ -59,17 +61,15 @@ namespace HoldingBag
                     {
                         parsedItemsList.Add(itemName);
                     }
-
                 }
             }
-
             // Otherwise if not in override mode, then load all items from all categories (from the given BS master list), optionally exluding specific categories and items
             else
             {
                 parsedItemsList = new List<string>(itemsList);
                 foreach (string categoryName in module.excludedCategories)
                 {
-                    parsedItemsList = parsedItemsList.FindAll(i => !Catalog.current.GetData<ItemData>(i, true).storageCategory.Contains(categoryName));
+                    parsedItemsList = parsedItemsList.FindAll(i => !Catalog.GetData<ItemPhysic>(i, true).categoryPath.Any(j => j.Contains(categoryName)));
                 }
 
                 foreach (string itemName in module.excludedItems)
@@ -100,8 +100,8 @@ namespace HoldingBag
 
         protected void SpawnAndSnap(string spawnedItemID, ObjectHolder holder)
         {
-            ItemData spawnedItemData = Catalog.current.GetData<ItemData>(spawnedItemID, true);
-            Debug.Log("[HoldingBag][Fetch][Spawn] Item Category: " + spawnedItemData.storageCategory + ", Item Name: " + spawnedItemData.displayName);
+            ItemPhysic spawnedItemData = Catalog.GetData<ItemPhysic>(spawnedItemID, true);
+            //Debug.Log("[HoldingBag][Fetch][Spawn] Item Categories: " + spawnedItemData.categoryPath + ", Item Name: " + spawnedItemData.displayName);
             if (spawnedItemData == null) return;
             else
             {
