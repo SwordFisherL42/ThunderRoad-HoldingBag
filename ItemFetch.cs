@@ -16,7 +16,7 @@ namespace HoldingBag
         private bool infiniteUses = false;
         private int usesRemaining = 0;
         private bool waitingForSpawn = false;
- 
+
         protected void Awake()
         {
             item = this.GetComponent<Item>();
@@ -24,7 +24,7 @@ namespace HoldingBag
             holder = item.GetComponentInChildren<Holder>();
             holder.UnSnapped += new Holder.HolderDelegate(this.OnWeaponItemRemoved);
             
-            //Trim list of ItemPhysic IDs by sub-type. Each ItemPhysic has its own type, defined by these enum indicies:
+            //Trim list of ItemData IDs by sub-type. Each ItemData has its own type, defined by these enum indicies:
             //Misc = 0
             //Weapon = 1
             //Quiver = 2
@@ -33,19 +33,19 @@ namespace HoldingBag
             //Body = 5
             //Shield = 6
 
-            //Get all ItemPhysic IDs from the chosen category. If no valid itemCategory is set, then no trimming is done and all types are valid for return
+            //Get all ItemData IDs from the chosen category. If no valid itemCategory is set, then no trimming is done and all types are valid for return
             if (module.itemCategory >= 0 && module.itemCategory <= 6)
             {
-                var categoryEnums = Enum.GetValues(typeof(ItemPhysic.Type));
-                ItemPhysic.Type chosenCategory = (ItemPhysic.Type)categoryEnums.GetValue(module.itemCategory);
-                itemsList = Catalog.GetAllID<ItemPhysic>().FindAll(i => Catalog.GetData<ItemPhysic>(i, true).type.Equals(chosenCategory));
-                //Only include ItemPhysic IDs which are purchasable 
-                itemsList = itemsList.FindAll(i => Catalog.GetData<ItemPhysic>(i, true).purchasable.Equals(true));
+                var categoryEnums = Enum.GetValues(typeof(ItemData.Type));
+                ItemData.Type chosenCategory = (ItemData.Type)categoryEnums.GetValue(module.itemCategory);
+                itemsList = Catalog.GetAllID<ItemData>().FindAll(i => Catalog.GetData<ItemData>(i, true).type.Equals(chosenCategory));
+                //Only include ItemData IDs which are purchasable 
+                itemsList = itemsList.FindAll(i => Catalog.GetData<ItemData>(i, true).purchasable.Equals(true));
             }
             //Otherwise, populate the list with everything as long as it is purchasable
             else
             {
-                itemsList = Catalog.GetAllID<ItemPhysic>().FindAll(i => Catalog.GetData<ItemPhysic>(i, true).purchasable.Equals(true));
+                itemsList = Catalog.GetAllID<ItemData>().FindAll(i => Catalog.GetData<ItemData>(i, true).purchasable.Equals(true));
             }
             
             // If the plugin is in `overrideMode`, first fetch items from the given category (if supplied) and then add any additionally given items to the parsed list
@@ -54,7 +54,7 @@ namespace HoldingBag
                 parsedItemsList = new List<string>();
                 if (!String.IsNullOrEmpty(module.overrideCategory))
                 {
-                    parsedItemsList = itemsList.FindAll(i => Catalog.GetData<ItemPhysic>(i, true).categoryPath.Any(j => j.Contains(module.overrideCategory)));
+                    parsedItemsList = itemsList.FindAll(i => Catalog.GetData<ItemData>(i, true).categoryPath.Any(j => j.Contains(module.overrideCategory)));
                 }
 
                 foreach (string itemName in module.overrideItems)
@@ -71,7 +71,7 @@ namespace HoldingBag
                 parsedItemsList = new List<string>(itemsList);
                 foreach (string categoryName in module.excludedCategories)
                 {
-                    parsedItemsList = parsedItemsList.FindAll(i => !Catalog.GetData<ItemPhysic>(i, true).categoryPath.Any(j => j.Contains(categoryName)));
+                    parsedItemsList = parsedItemsList.FindAll(i => !Catalog.GetData<ItemData>(i, true).categoryPath.Any(j => j.Contains(categoryName)));
                 }
 
                 foreach (string itemName in module.excludedItems)
@@ -110,30 +110,31 @@ namespace HoldingBag
         protected void SpawnAndSnap(string spawnedItemID, Holder holder)
         {
             if (waitingForSpawn) return;
-            ItemPhysic spawnedItemData = Catalog.GetData<ItemPhysic>(spawnedItemID, true);
+            ItemData spawnedItemData = Catalog.GetData<ItemData>(spawnedItemID, true);
             if (spawnedItemData == null) return;
             else
             {
                 waitingForSpawn = true;
                 spawnedItemData.SpawnAsync(thisSpawnedItem =>
                 {
-                    Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Spawning weapon: " + thisSpawnedItem.name);
+                    //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Spawning weapon: " + thisSpawnedItem.name);
                     try
                     {
-                        waitingForSpawn = false;
                         if (holder.HasSlotFree())
                         {
                             holder.Snap(thisSpawnedItem);
-                            Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Snapped weapon: " + thisSpawnedItem.name);
+                            //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Snapped weapon: " + thisSpawnedItem.name);
+                            //waitingForSpawn = false;
                         }
                         else
                         {
                             Debug.Log("[Fisher-HoldingBags] EXCEPTION Time: " + Time.time + " NO FREE SLOT FOR: " + thisSpawnedItem.name);
                         }
+                        waitingForSpawn = false;
                     }
-                    catch { Debug.Log("[Fisher-HoldingBags] EXCEPTION IN SNAPPING "); }
+                    catch (Exception e) { Debug.Log("[Fisher-HoldingBags] EXCEPTION IN SNAPPING: " + e.ToString()); }
                 });
-                Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Activating SpawnAndSnap: " + spawnedItemID);
+                //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Activating SpawnAndSnap: " + spawnedItemID);
                 return;
             }
         }
@@ -150,7 +151,7 @@ namespace HoldingBag
             }
             else
             {
-                Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Activating OnWeaponItemRemoved: " + interactiveObject.data.id);
+                //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Activating OnWeaponItemRemoved: " + interactiveObject.data.id);
                 SpawnAndSnap(GetRandomItemID(parsedItemsList), holder);
                 usesRemaining -= 1;
                 return;
