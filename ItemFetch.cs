@@ -10,19 +10,21 @@ namespace HoldingBag
     {
         protected Item item;
         protected ItemModuleFetch module;
-        protected ObjectHolder holder;
+        protected Holder holder;
         protected List<string> itemsList;
         protected List<string> parsedItemsList;
         private bool infiniteUses = false;
         private int usesRemaining = 0;
+        private bool waitingForSpawn = false;
+
         protected void Awake()
         {
             item = this.GetComponent<Item>();
             module = item.data.GetModule<ItemModuleFetch>();
-            holder = item.GetComponentInChildren<ObjectHolder>();
-            holder.UnSnapped += new ObjectHolder.HolderDelegate(this.OnWeaponItemRemoved);
-
-            //Trim list of ItemPhysic IDs by sub-type. Each ItemPhysic has its own type, defined by these enum indicies:
+            holder = item.GetComponentInChildren<Holder>();
+            holder.UnSnapped += new Holder.HolderDelegate(this.OnWeaponItemRemoved);
+            
+            //Trim list of ItemData IDs by sub-type. Each ItemData has its own type, defined by these enum indicies:
             //Misc = 0
             //Weapon = 1
             //Quiver = 2
@@ -31,19 +33,19 @@ namespace HoldingBag
             //Body = 5
             //Shield = 6
 
-            //Get all ItemPhysic IDs from the chosen category. If no valid itemCategory is set, then no trimming is done and all types are valid for return
-            if (module.itemCategory >= 0 || module.itemCategory > 6)
+            //Get all ItemData IDs from the chosen category. If no valid itemCategory is set, then no trimming is done and all types are valid for return
+            if (module.itemCategory >= 0 && module.itemCategory <= 6)
             {
-                var categoryEnums = Enum.GetValues(typeof(ItemPhysic.Type));
-                ItemPhysic.Type chosenCategory = (ItemPhysic.Type)categoryEnums.GetValue(module.itemCategory);
-                itemsList = Catalog.GetAllID<ItemPhysic>().FindAll(i => Catalog.GetData<ItemPhysic>(i, true).type.Equals(chosenCategory));
-                //Only include ItemPhysic IDs which are purchasable 
-                itemsList = itemsList.FindAll(i => Catalog.GetData<ItemPhysic>(i, true).purchasable.Equals(true));
+                var categoryEnums = Enum.GetValues(typeof(ItemData.Type));
+                ItemData.Type chosenCategory = (ItemData.Type)categoryEnums.GetValue(module.itemCategory);
+                itemsList = Catalog.GetAllID<ItemData>().FindAll(i => Catalog.GetData<ItemData>(i, true).type.Equals(chosenCategory));
+                //Only include ItemData IDs which are purchasable 
+                itemsList = itemsList.FindAll(i => Catalog.GetData<ItemData>(i, true).purchasable.Equals(true));
             }
             //Otherwise, populate the list with everything as long as it is purchasable
             else
             {
-                itemsList = Catalog.GetAllID<ItemPhysic>().FindAll(i => Catalog.GetData<ItemPhysic>(i, true).purchasable.Equals(true));
+                itemsList = Catalog.GetAllID<ItemData>().FindAll(i => Catalog.GetData<ItemData>(i, true).purchasable.Equals(true));
             }
             
             // If the plugin is in `overrideMode`, first fetch items from the given category (if supplied) and then add any additionally given items to the parsed list
@@ -52,7 +54,7 @@ namespace HoldingBag
                 parsedItemsList = new List<string>();
                 if (!String.IsNullOrEmpty(module.overrideCategory))
                 {
-                    parsedItemsList = itemsList.FindAll(i => Catalog.GetData<ItemPhysic>(i, true).categoryPath.Any(j => j.Contains(module.overrideCategory)));
+                    parsedItemsList = itemsList.FindAll(i => Catalog.GetData<ItemData>(i, true).categoryPath.Any(j => j.Contains(module.overrideCategory)));
                 }
 
                 foreach (string itemName in module.overrideItems)
@@ -69,7 +71,7 @@ namespace HoldingBag
                 parsedItemsList = new List<string>(itemsList);
                 foreach (string categoryName in module.excludedCategories)
                 {
-                    parsedItemsList = parsedItemsList.FindAll(i => !Catalog.GetData<ItemPhysic>(i, true).categoryPath.Any(j => j.Contains(categoryName)));
+                    parsedItemsList = parsedItemsList.FindAll(i => !Catalog.GetData<ItemData>(i, true).categoryPath.Any(j => j.Contains(categoryName)));
                 }
 
                 foreach (string itemName in module.excludedItems)
@@ -87,10 +89,17 @@ namespace HoldingBag
             {
                 usesRemaining = module.capacity - 1;
             }
-            
-            // Spawn initial random item in the holder
-            SpawnAndSnap(GetRandomItemID(parsedItemsList), holder);
+
+            waitingForSpawn = false;
+            Debug.Log("[Fisher-HoldingBags] AWAKE HOLDING BAG: " + Time.time);
             return;
+        }
+
+        protected void Start()
+        {
+            // Spawn initial random item in the holder
+            Debug.Log("[Fisher-HoldingBags] STARTING HOLDING BAG: "  + Time.time);
+            SpawnAndSnap(GetRandomItemID(parsedItemsList), holder);
         }
 
         protected string GetRandomItemID(List<string> itemsList)
@@ -98,22 +107,42 @@ namespace HoldingBag
             return itemsList[UnityEngine.Random.Range(0, itemsList.Count)];
         }
 
-        protected void SpawnAndSnap(string spawnedItemID, ObjectHolder holder)
+        protected void SpawnAndSnap(string spawnedItemID, Holder holder)
         {
-            ItemPhysic spawnedItemData = Catalog.GetData<ItemPhysic>(spawnedItemID, true);
-            //Debug.Log("[HoldingBag][Fetch][Spawn] Item Categories: " + spawnedItemData.categoryPath + ", Item Name: " + spawnedItemData.displayName);
+            if (waitingForSpawn) return;
+            ItemData spawnedItemData = Catalog.GetData<ItemData>(spawnedItemID, true);
             if (spawnedItemData == null) return;
             else
             {
-                Item thisSpawnedItem = spawnedItemData.Spawn(true);
-                if (!thisSpawnedItem.gameObject.activeInHierarchy) thisSpawnedItem.gameObject.SetActive(true);
-                holder.Snap(thisSpawnedItem);
+                waitingForSpawn = true;
+                spawnedItemData.SpawnAsync(thisSpawnedItem =>
+                {
+                    //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Spawning weapon: " + thisSpawnedItem.name);
+                    try
+                    {
+                        if (holder.HasSlotFree())
+                        {
+                            holder.Snap(thisSpawnedItem);
+                            //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Snapped weapon: " + thisSpawnedItem.name);
+                            //waitingForSpawn = false;
+                        }
+                        else
+                        {
+                            Debug.Log("[Fisher-HoldingBags] EXCEPTION Time: " + Time.time + " NO FREE SLOT FOR: " + thisSpawnedItem.name);
+                        }
+                        waitingForSpawn = false;
+                    }
+                    catch (Exception e) { Debug.Log("[Fisher-HoldingBags] EXCEPTION IN SNAPPING: " + e.ToString()); }
+                });
+                //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Activating SpawnAndSnap: " + spawnedItemID);
                 return;
             }
         }
 
         protected void OnWeaponItemRemoved(Item interactiveObject)
         {
+            if (waitingForSpawn) return;
+
             if ((!infiniteUses) && (usesRemaining <= 0))
             {
                 holder.data.locked = true;
@@ -122,13 +151,12 @@ namespace HoldingBag
             }
             else
             {
+                //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Activating OnWeaponItemRemoved: " + interactiveObject.data.id);
                 SpawnAndSnap(GetRandomItemID(parsedItemsList), holder);
                 usesRemaining -= 1;
                 return;
             }
-
         }
 
     }
 }
-
