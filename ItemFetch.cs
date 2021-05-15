@@ -117,7 +117,7 @@ namespace HoldingBag
                 waitingForSpawn = true;
                 spawnedItemData.SpawnAsync(thisSpawnedItem =>
                 {
-                    //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Spawning weapon: " + thisSpawnedItem.name);
+                    Debug.Log("[Fisher-HoldingBags] Spawning weapon: " + thisSpawnedItem.name +" with ID:" + spawnedItemID);
                     try
                     {
                         if (holder.HasSlotFree())
@@ -132,9 +132,9 @@ namespace HoldingBag
                         }
                         waitingForSpawn = false;
                     }
-                    catch (Exception e) { Debug.Log("[Fisher-HoldingBags] EXCEPTION IN SNAPPING: " + e.ToString()); }
+                    catch (Exception e) { Debug.Log("[Fisher-HoldingBags] " + spawnedItemID + "EXCEPTION IN SNAPPING: " + e.ToString()); }
                 });
-                //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Activating SpawnAndSnap: " + spawnedItemID);
+                Debug.Log("[Fisher-HoldingBags] Snapping Weapon " + spawnedItemID);
                 return;
             }
         }
