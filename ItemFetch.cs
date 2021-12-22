@@ -123,6 +123,7 @@ namespace HoldingBag
                         if (holder.HasSlotFree())
                         {
                             holder.Snap(thisSpawnedItem);
+                            thisSpawnedItem.SetMeshLayer(GameManager.GetLayer(LayerName.FPVHide));
                             //Debug.Log("[Fisher-HoldingBags] Time: " + Time.time + " Snapped weapon: " + thisSpawnedItem.name);
                             //waitingForSpawn = false;
                         }
