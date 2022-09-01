@@ -2,7 +2,7 @@
 using ThunderRoad;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+//using System.Linq;
 
 namespace HoldingBag
 {
@@ -54,7 +54,7 @@ namespace HoldingBag
                 parsedItemsList = new List<string>();
                 if (!String.IsNullOrEmpty(module.overrideCategory))
                 {
-                    parsedItemsList = itemsList.FindAll(i => Catalog.GetData<ItemData>(i, true).categoryPath.Any(j => j.Contains(module.overrideCategory)));
+                    parsedItemsList = itemsList.FindAll(i => Catalog.GetData<ItemData>(i, true).category.Contains(module.overrideCategory));
                 }
 
                 foreach (string itemName in module.overrideItems)
@@ -71,7 +71,7 @@ namespace HoldingBag
                 parsedItemsList = new List<string>(itemsList);
                 foreach (string categoryName in module.excludedCategories)
                 {
-                    parsedItemsList = parsedItemsList.FindAll(i => !Catalog.GetData<ItemData>(i, true).categoryPath.Any(j => j.Contains(categoryName)));
+                    parsedItemsList = parsedItemsList.FindAll(i => !Catalog.GetData<ItemData>(i, true).category.Contains(categoryName));
                 }
 
                 foreach (string itemName in module.excludedItems)
